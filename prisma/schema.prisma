@@ -1,0 +1,158 @@
+// Prisma schema untuk SPGE Groundcheck System (SGS)
+// Compatible dengan Supabase (PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Model untuk pengguna (User dan Admin)
+model User {
+  id            String   @id @default(cuid())
+  username      String   @unique
+  password      String
+  nama          String
+  role          String   // "admin" atau "user"
+  email         String?  @unique
+  phone         String?
+  avatar        String?
+  isActive      Boolean  @default(true)
+  lastLogin     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  tasks         Task[]
+  signatures    DigitalSignature[]
+  
+  @@map("users")
+}
+
+// Model untuk Divisi
+model Divisi {
+  id            String   @id @default(cuid())
+  kode          String   @unique // "1", "2", "3"
+  nama          String
+  deskripsi     String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  kemandoran    Kemandoran[]
+  tasks         Task[]
+  
+  @@map("divisi")
+}
+
+// Model untuk Kemandoran
+model Kemandoran {
+  id            String   @id @default(cuid())
+  kode          String   @unique // "A", "B", "C"
+  nama          String
+  divisiId      String
+  deskripsi     String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  divisi        Divisi   @relation(fields: [divisiId], references: [id], onDelete: Cascade)
+  tasks         Task[]
+  
+  @@map("kemandoran")
+}
+
+// Model untuk Task/Hasil Ground Check
+model Task {
+  id                String   @id @default(cuid())
+  nomorTask         String   @unique // Nomor unik task
+  namaKrani         String
+  userId            String
+  divisiId          String
+  kemandoranId      String
+  notes             String?  // Catatan nama pemanen buah mentah
+  status            String   @default("draft") // "draft", "submitted", "approved"
+  submittedAt       DateTime?
+  approvedAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  divisi            Divisi       @relation(fields: [divisiId], references: [id], onDelete: Cascade)
+  kemandoran        Kemandoran   @relation(fields: [kemandoranId], references: [id], onDelete: Cascade)
+  tphAttachments    TphAttachment[]
+  signature         DigitalSignature?
+  
+  @@map("tasks")
+}
+
+// Model untuk TPH (Tempat Pengumpulan Hasil) Attachment
+model TphAttachment {
+  id            String   @id @default(cuid())
+  taskId        String
+  tphNumber     Int      // Nomor TPH (1, 2, 3, dst)
+  photos        String   // JSON array of photo base64 or URLs
+  notes         String?
+  latitude      Float?
+  longitude     Float?
+  capturedAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  @@map("tph_attachments")
+}
+
+// Model untuk Tanda Tangan Digital
+model DigitalSignature {
+  id            String   @id @default(cuid())
+  userId        String
+  taskId        String   @unique
+  signatureData String   // Base64 PNG data
+  signedAt      DateTime @default(now())
+  createdAt     DateTime @default(now())
+  
+  // Relations
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  @@map("digital_signatures")
+}
+
+// Model untuk menyimpan data offline sync
+model OfflineSyncQueue {
+  id            String   @id @default(cuid())
+  action        String   // "create", "update", "delete"
+  tableName     String
+  recordId      String
+  data          String   // JSON string
+  synced        Boolean  @default(false)
+  syncedAt      DateTime?
+  createdAt     DateTime @default(now())
+  
+  @@map("offline_sync_queue")
+}
+
+// Model untuk audit log
+model AuditLog {
+  id            String   @id @default(cuid())
+  userId        String?
+  action        String
+  tableName     String?
+  recordId      String?
+  oldData       String?  // JSON
+  newData       String?  // JSON
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+  
+  @@map("audit_logs")
+}
